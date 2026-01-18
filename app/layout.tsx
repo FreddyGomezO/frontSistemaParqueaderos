@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
-import { Toaster } from "react-hot-toast"
+import { Toaster } from "sonner" // Cambiado de react-hot-toast a sonner
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"] })
@@ -39,23 +39,21 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="font-sans antialiased bg-muted/30">
-
         {/* CONTENIDO DE LA APP */}
         {children}
 
-        {/* 🔔 NOTIFICACIONES GLOBALES */}
+        {/* 🔔 NOTIFICACIONES GLOBALES CON SONNER */}
         <Toaster
           position="top-right"
-          reverseOrder={false}
-          gutter={8}
+          expand={false}
+          richColors
+          closeButton
           toastOptions={{
-            duration: 3000,
-            style: {
-              background: "#1f2937",
-              color: "#fff",
-              fontWeight: 500,
-              borderRadius: "10px",
-              maxWidth: "420px",
+            classNames: {
+              toast: "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+              description: "group-[.toast]:text-muted-foreground",
+              actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+              cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
             },
           }}
         />
