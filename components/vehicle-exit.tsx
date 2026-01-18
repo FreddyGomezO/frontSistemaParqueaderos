@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, Clock, DollarSign, Car, Printer } from "lucide-react"
+import { Search, Clock, DollarSign, Car, Printer, Moon } from "lucide-react"
 import { useSWRConfig } from "swr"
 
 // Tipos
@@ -26,6 +26,7 @@ interface VehiculoBusqueda {
   fecha_hora_salida: string | null
   costo_total: number | null
   estado: string
+  es_nocturno: boolean  // ✅ AGREGADO
   creado_en: string
   costo_estimado: number
   tiempo_estimado: string
@@ -40,6 +41,8 @@ interface Factura {
   tiempo_total: string
   costo_total: number
   detalles: string
+  es_nocturno: boolean  // ✅ AGREGADO
+  tarifa_aplicada?: string  // ✅ OPCIONAL
 }
 
 // Datos del hotel para la factura
@@ -113,126 +116,138 @@ export function VehicleExit() {
   }
 
   const handleImprimir = () => {
-  if (!factura) return
+    if (!factura) return
 
-  const entrada = new Date(factura.entrada)
-  const salida = new Date(factura.salida)
+    const entrada = new Date(factura.entrada)
+    const salida = new Date(factura.salida)
 
-  const fEntrada = entrada.toLocaleDateString("es-EC")
-  const hEntrada = entrada.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
+    const fEntrada = entrada.toLocaleDateString("es-EC")
+    const hEntrada = entrada.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
 
-  const fSalida = salida.toLocaleDateString("es-EC")
-  const hSalida = salida.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
+    const fSalida = salida.toLocaleDateString("es-EC")
+    const hSalida = salida.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
 
-  const printWindow = window.open("", "", "width=400,height=600")
-  if (!printWindow) return
+    const printWindow = window.open("", "", "width=400,height=600")
+    if (!printWindow) return
 
-  printWindow.document.write(`
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Ticket Salida</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 2mm;
-          }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            margin: 0;
-            padding: 2mm;
-            width: 70mm;
-            line-height: 1.3;
-          }
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .placa {
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            margin: 6px 0;
-            border: 2px solid #000;
-            padding: 5px;
-          }
-          hr {
-            border: 0;
-            border-top: 1px dashed #000;
-            margin: 5px 0;
-          }
-          table {
-            width: 100%;
-            font-size: 13px;
-          }
-          td {
-            padding: 2px 0;
-          }
-          .total {
-            font-size: 18px;
-            font-weight: bold;
-          }
-          .mensaje {
-            text-align: center;
-            font-size: 12px;
-            margin-top: 6px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="center bold">${HOTEL_INFO.nombre}</div>
-        <div class="center">Sistema de Parqueadero</div>
-        <hr>
+    printWindow.document.write(`
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Ticket Salida</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 2mm;
+            }
+            body {
+              font-family: 'Courier New', monospace;
+              font-size: 13px;
+              margin: 0;
+              padding: 2mm;
+              width: 70mm;
+              line-height: 1.3;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .placa {
+              text-align: center;
+              font-size: 22px;
+              font-weight: bold;
+              letter-spacing: 2px;
+              margin: 6px 0;
+              border: 2px solid #000;
+              padding: 5px;
+            }
+            hr {
+              border: 0;
+              border-top: 1px dashed #000;
+              margin: 5px 0;
+            }
+            table {
+              width: 100%;
+              font-size: 13px;
+            }
+            td {
+              padding: 2px 0;
+            }
+            .total {
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .mensaje {
+              text-align: center;
+              font-size: 12px;
+              margin-top: 6px;
+            }
+            .nocturno {
+              text-align: center;
+              color: #dc2626;
+              font-weight: bold;
+              margin: 4px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="center bold">${HOTEL_INFO.nombre}</div>
+          <div class="center">Sistema de Parqueadero</div>
+          <hr>
 
-        <div class="center bold">TICKET DE SALIDA</div>
+          <div class="center bold">TICKET DE SALIDA</div>
+          
+          ${factura.es_nocturno ? '<div class="nocturno">⚠️ TARIFA NOCTURNA ⚠️</div>' : ''}
 
-        <div class="placa">${factura.placa}</div>
-        <div class="center bold">ESPACIO #${factura.espacio}</div>
+          <div class="placa">${factura.placa}</div>
+          <div class="center bold">ESPACIO #${factura.espacio}</div>
 
-        <hr>
+          <hr>
 
-        <table>
-          <tr>
-            <td>Entrada:</td>
-            <td align="right">${fEntrada} ${hEntrada}</td>
-          </tr>
-          <tr>
-            <td>Salida:</td>
-            <td align="right">${fSalida} ${hSalida}</td>
-          </tr>
-          <tr>
-            <td>Tiempo:</td>
-            <td align="right">${factura.tiempo_total}</td>
-          </tr>
-        </table>
+          <table>
+            <tr>
+              <td>Entrada:</td>
+              <td align="right">${fEntrada} ${hEntrada}</td>
+            </tr>
+            <tr>
+              <td>Salida:</td>
+              <td align="right">${fSalida} ${hSalida}</td>
+            </tr>
+            <tr>
+              <td>Tiempo:</td>
+              <td align="right">${factura.tiempo_total}</td>
+            </tr>
+            ${factura.es_nocturno ? 
+              '<tr><td>Tarifa:</td><td align="right"><strong>NOCTURNA</strong></td></tr>' : 
+              ''
+            }
+          </table>
 
-        <hr>
+          <hr>
 
-        <table>
-          <tr class="total">
-            <td>TOTAL:</td>
-            <td align="right">$${factura.costo_total.toFixed(2)}</td>
-          </tr>
-        </table>
+          <table>
+            <tr class="total">
+              <td>TOTAL:</td>
+              <td align="right">$${factura.costo_total.toFixed(2)}</td>
+            </tr>
+          </table>
 
-        <hr>
+          <hr>
 
-        <div class="mensaje">
-          Gracias por su visita<br>
-          ${new Date().toLocaleString("es-EC")}
-        </div>
-      </body>
-    </html>
-  `)
+          <div class="mensaje">
+            ${factura.detalles}<br>
+            Gracias por su visita<br>
+            ${new Date().toLocaleString("es-EC")}
+          </div>
+        </body>
+      </html>
+    `)
 
-  printWindow.document.close()
+    printWindow.document.close()
 
-  setTimeout(() => {
-    printWindow.print()
-    setTimeout(() => printWindow.close(), 100)
-  }, 400)
-}
-
+    setTimeout(() => {
+      printWindow.print()
+      setTimeout(() => printWindow.close(), 100)
+    }, 400)
+  }
 
   const formatDateTime = (isoString: string) => {
     const date = new Date(isoString)
@@ -277,6 +292,18 @@ export function VehicleExit() {
 
           {vehiculo && (
             <div className="rounded-lg border bg-card p-4 space-y-4">
+              {/* AGREGAR BADGE NOCTURNO */}
+              {vehiculo.es_nocturno && (
+                <div className="flex justify-center">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/50">
+                    <Moon className="h-3 w-3 text-amber-600" />
+                    <span className="text-xs font-medium text-amber-700">
+                      ⚠️ VEHÍCULO NOCTURNO - Tarifa Fija: ${vehiculo.costo_estimado.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Placa</p>
@@ -300,15 +327,36 @@ export function VehicleExit() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Costo estimado</p>
-                    <p className="font-bold text-lg">${vehiculo.costo_estimado.toFixed(2)}</p>
+                    <p className={`font-bold text-lg ${vehiculo.es_nocturno ? 'text-amber-600' : ''}`}>
+                      ${vehiculo.costo_estimado.toFixed(2)}
+                      {vehiculo.es_nocturno && ' (Nocturno)'}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="text-sm text-muted-foreground bg-muted/50 rounded p-2">{vehiculo.detalles}</div>
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded p-2">
+                {vehiculo.detalles}
+                {vehiculo.es_nocturno && (
+                  <div className="mt-1 text-amber-600 font-medium">
+                    ⭐ Tarifa nocturna fija aplicada
+                  </div>
+                )}
+              </div>
 
-              <Button onClick={handleRegistrarSalida} className="w-full" size="lg" disabled={processing}>
-                {processing ? "Procesando..." : "Registrar Salida y Generar Factura"}
+              <Button 
+                onClick={handleRegistrarSalida} 
+                className={`w-full ${vehiculo.es_nocturno ? "bg-amber-600 hover:bg-amber-700" : ""}`} 
+                size="lg" 
+                disabled={processing}
+                variant={vehiculo.es_nocturno ? "default" : "default"}
+              >
+                {processing 
+                  ? "Procesando..." 
+                  : vehiculo.es_nocturno 
+                    ? `Registrar Salida (Nocturno - $${vehiculo.costo_estimado.toFixed(2)})`
+                    : "Registrar Salida y Generar Factura"
+                }
               </Button>
             </div>
           )}
@@ -324,6 +372,17 @@ export function VehicleExit() {
 
           {factura && (
             <div ref={facturaRef} className="font-mono text-sm space-y-3 border rounded-lg p-4 bg-background">
+              {/* AGREGAR BADGE NOCTURNO */}
+              {factura.es_nocturno && (
+                <div className="text-center mb-2">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/50">
+                    <span className="text-xs font-medium text-amber-700">
+                      ⚠️ TARIFA NOCTURNA APLICADA
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               <div className="header text-center border-b-2 border-dashed pb-3">
                 <p className="hotel-name text-lg font-bold">{HOTEL_INFO.nombre}</p>
                 <p className="info text-xs text-muted-foreground">{HOTEL_INFO.direccion}</p>
@@ -369,7 +428,14 @@ export function VehicleExit() {
 
               <div className="divider border-t border-dashed my-2" />
 
-              <div className="text-xs text-muted-foreground whitespace-pre-wrap">{factura.detalles}</div>
+              <div className="text-xs text-muted-foreground whitespace-pre-wrap">
+                {factura.detalles}
+                {factura.es_nocturno && (
+                  <div className="mt-1 text-amber-600 font-medium">
+                    ⭐ Tarifa nocturna fija aplicada
+                  </div>
+                )}
+              </div>
 
               <div className="divider border-t-2 border-dashed my-2" />
 
