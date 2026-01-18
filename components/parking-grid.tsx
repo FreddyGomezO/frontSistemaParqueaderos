@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { obtenerEspacios, registrarEntrada } from "@/servicios/vehiculoService"
+import { obtenerConfiguracion } from "@/servicios/configuracionService"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,14 +16,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Car, Clock } from "lucide-react"
+import { Car, Clock, Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
 
 interface Espacio {
   numero: number
   ocupado: boolean
   placa: string | null
   entrada: string | null
+}
+
+interface Configuracion {
+  id: number
+  precio_media_hora: number
+  precio_hora_adicional: number
+  precio_nocturno: number
+  hora_inicio_nocturno: string
+  hora_fin_nocturno: string
+  actualizado_en: string | null
 }
 
 export function ParkingGrid() {
@@ -32,19 +44,59 @@ export function ParkingGrid() {
     isLoading,
     mutate,
   } = useSWR<Espacio[]>("espacios", obtenerEspacios, {
-    refreshInterval: 5000, // Actualizar cada 5 segundos
+    refreshInterval: 5000,
   })
+
+  // Obtener configuración
+  const { data: config } = useSWR<Configuracion>("configuracion", obtenerConfiguracion)
 
   const [selectedEspacio, setSelectedEspacio] = useState<number | null>(null)
   const [placa, setPlaca] = useState("")
+  const [esNocturno, setEsNocturno] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
+
+  // Función para verificar si estamos en horario nocturno
+  const estaEnHorarioNocturno = (): boolean => {
+    if (!config) return false
+    
+    const ahora = new Date()
+    const horaActual = ahora.getHours()
+    const minutoActual = ahora.getMinutes()
+    const horaActualEnMinutos = horaActual * 60 + minutoActual
+    
+    // Parsear horas de configuración
+    const [horaInicioStr, minutoInicioStr] = config.hora_inicio_nocturno.split(':')
+    const [horaFinStr, minutoFinStr] = config.hora_fin_nocturno.split(':')
+    
+    const horaInicio = parseInt(horaInicioStr)
+    const minutoInicio = parseInt(minutoInicioStr)
+    const horaFin = parseInt(horaFinStr)
+    const minutoFin = parseInt(minutoFinStr)
+    
+    const inicioEnMinutos = horaInicio * 60 + minutoInicio
+    const finEnMinutos = horaFin * 60 + minutoFin
+    
+    // Lógica de horario nocturno (puede pasar al día siguiente)
+    if (inicioEnMinutos < finEnMinutos) {
+      // Horario normal: 18:00 - 06:00 del mismo día
+      return horaActualEnMinutos >= inicioEnMinutos && horaActualEnMinutos < finEnMinutos
+    } else {
+      // Horario que pasa al día siguiente: 18:00 - 06:00 (pasa medianoche)
+      return horaActualEnMinutos >= inicioEnMinutos || horaActualEnMinutos < finEnMinutos
+    }
+  }
 
   const handleEspacioClick = (espacio: Espacio) => {
     if (!espacio.ocupado) {
       setSelectedEspacio(espacio.numero)
       setPlaca("")
+      
+      // Determinar si mostrar el switch según la hora actual
+      const mostrarSwitch = estaEnHorarioNocturno()
+      setEsNocturno(mostrarSwitch) // Si está en horario nocturno, activar por defecto
+      
       setSubmitError("")
       setDialogOpen(true)
     }
@@ -57,15 +109,18 @@ export function ParkingGrid() {
     setSubmitError("")
 
     try {
-      const resultado = await registrarEntrada(placa.trim(), selectedEspacio)
-      
+      // Pasar esNocturno al servicio (solo si está en horario nocturno)
+      const aplicarNocturno = estaEnHorarioNocturno() ? esNocturno : false
+      const resultado = await registrarEntrada(placa.trim(), selectedEspacio, aplicarNocturno)
+
       if (resultado.ok) {
         // Imprimir ticket de entrada automáticamente
-        imprimirTicketEntrada(resultado.data)
-        
-        await mutate() // Refrescar los espacios
+        imprimirTicketEntrada(resultado.data, aplicarNocturno)
+
+        await mutate()
         setDialogOpen(false)
         setPlaca("")
+        setEsNocturno(false)
         setSelectedEspacio(null)
       } else {
         setSubmitError(resultado.message || "Error al registrar entrada")
@@ -76,16 +131,15 @@ export function ParkingGrid() {
       setSubmitting(false)
     }
   }
-
-  const imprimirTicketEntrada = (vehiculo: any) => {
+  const imprimirTicketEntrada = (vehiculo: any, esNocturno: boolean) => {
     const fechaEntrada = new Date(vehiculo.fecha_hora_entrada)
-    const fecha = fechaEntrada.toLocaleDateString("es-EC", { 
-      day: "2-digit", 
-      month: "2-digit", 
-      year: "numeric" 
+    const fecha = fechaEntrada.toLocaleDateString("es-EC", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
     })
-    const hora = fechaEntrada.toLocaleTimeString("es-EC", { 
-      hour: "2-digit", 
+    const hora = fechaEntrada.toLocaleTimeString("es-EC", {
+      hour: "2-digit",
       minute: "2-digit",
       hour12: true
     })
@@ -116,6 +170,15 @@ export function ParkingGrid() {
               .bold { 
                 font-weight: bold; 
               }
+              .logo {
+                text-align: center;
+                margin: 8px 0 10px 0;
+              }
+              .logo img {
+                width: 120px;
+                height: auto;
+                object-fit: contain;
+              }
               .placa {
                 text-align: center;
                 font-size: 22px;
@@ -138,6 +201,12 @@ export function ParkingGrid() {
               td {
                 padding: 2px 0;
               }
+              .nocturno {
+                text-align: center;
+                color: #dc2626;
+                font-weight: bold;
+                margin: 4px 0;
+              }
               .label {
                 width: 28%;
               }
@@ -150,10 +219,13 @@ export function ParkingGrid() {
             </style>
           </head>
           <body>
-            <div class="center bold">HOTEL GRAN PLAZA</div>
+            <div class="logo">
+              <img src="${window.location.origin}/42dd1c4b-77e6-48fa-b3c1-df5bfd43fee7.png" alt="Hotel La Farola">
+            </div>
             <div class="center">Sistema de Parqueadero</div>
             <hr>
             <div class="center bold">TICKET DE ENTRADA</div>
+            ${esNocturno ? '<div class="nocturno">⚠️ TARIFA NOCTURNA ⚠️</div>' : ''}
             <div class="placa">${vehiculo.placa}</div>
             <div class="center bold">ESPACIO #${vehiculo.espacio_numero}</div>
             <hr>
@@ -166,6 +238,7 @@ export function ParkingGrid() {
                 <td class="label">Hora:</td>
                 <td>${hora}</td>
               </tr>
+              ${esNocturno ? '<tr><td class="label">Tarifa:</td><td><strong>NOCTURNA</strong></td></tr>' : ''}
             </table>
             <hr>
             <div class="mensaje">
@@ -173,16 +246,15 @@ Entregue este comprobante
 para su salida. Parqueadero
 tarifado. La perdida de
 ticket generara una perdida
-de 5.00$
+de 10.00$
             </div>
           </body>
         </html>
       `)
       printWindow.document.close()
-      
+
       setTimeout(() => {
         printWindow.print()
-        // Cerrar la ventana automáticamente después de imprimir
         setTimeout(() => {
           printWindow.close()
         }, 100)
@@ -194,6 +266,9 @@ de 5.00$
     const date = new Date(entrada)
     return date.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })
   }
+
+  // Verificar si debemos mostrar el switch
+  const mostrarSwitchNocturno = estaEnHorarioNocturno()
 
   if (isLoading) {
     return (
@@ -247,6 +322,16 @@ de 5.00$
                 <div className="h-3 w-3 rounded-full bg-rose-500" />
                 <span>Ocupados: {espaciosOcupados}</span>
               </div>
+              {/* Mostrar estado del horario nocturno */}
+              {config && (
+                <div className="flex items-center gap-2">
+                  <div className={`h-3 w-3 rounded-full ${mostrarSwitchNocturno ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                  <span>
+                    {mostrarSwitchNocturno ? 'Horario Nocturno' : 'Horario Normal'} 
+                    ({config.hora_inicio_nocturno} - {config.hora_fin_nocturno})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -310,14 +395,69 @@ de 5.00$
                 }}
               />
             </div>
+
+            {/* NUEVO: Switch SOLO si estamos en horario nocturno */}
+            {mostrarSwitchNocturno && (
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${esNocturno ? 'bg-amber-500/20' : 'bg-gray-200'}`}>
+                    {esNocturno ? (
+                      <Moon className="h-5 w-5 text-amber-600" />
+                    ) : (
+                      <Sun className="h-5 w-5 text-gray-600" />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="nocturno" className="font-medium">
+                      Tarifa Nocturna
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {esNocturno
+                        ? "El vehículo pagará tarifa nocturna completa ($10.00)"
+                        : "Tarifa normal por horas progresiva"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Horario nocturno configurado: {config?.hora_inicio_nocturno} - {config?.hora_fin_nocturno}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="nocturno"
+                  checked={esNocturno}
+                  onCheckedChange={setEsNocturno}
+                  className="data-[state=checked]:bg-amber-600"
+                />
+              </div>
+            )}
+
+            {/* Mensaje si NO estamos en horario nocturno */}
+            {!mostrarSwitchNocturno && config && (
+              <div className="p-3 border rounded-lg bg-gray-50">
+                <p className="text-sm text-muted-foreground">
+                  ⏰ <strong>Horario Normal</strong><br/>
+                  Fuera del horario nocturno ({config.hora_inicio_nocturno} - {config.hora_fin_nocturno})<br/>
+                  Se aplicará tarifa progresiva por horas.
+                </p>
+              </div>
+            )}
+
             {submitError && <p className="text-sm text-destructive">{submitError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={handleRegistrarEntrada} disabled={!placa.trim() || submitting}>
-              {submitting ? "Registrando..." : "Registrar Entrada"}
+            <Button
+              onClick={handleRegistrarEntrada}
+              disabled={!placa.trim() || submitting}
+              className={esNocturno && mostrarSwitchNocturno ? "bg-amber-600 hover:bg-amber-700" : ""}
+            >
+              {submitting
+                ? "Registrando..."
+                : esNocturno && mostrarSwitchNocturno
+                  ? `Registrar (Nocturno - $${config?.precio_nocturno || '10.00'})`
+                  : "Registrar Entrada"
+              }
             </Button>
           </DialogFooter>
         </DialogContent>

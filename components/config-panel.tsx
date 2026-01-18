@@ -25,7 +25,7 @@ export function ConfigPanel() {
   const { data: config, error, isLoading, mutate } = useSWR<Configuracion>("configuracion", obtenerConfiguracion)
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState("")
+  const [saveError, setSaveError] = useState<string>("") // <-- Especifica string
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [formData, setFormData] = useState<Partial<Configuracion>>({})
 
@@ -45,27 +45,43 @@ export function ConfigPanel() {
   }
 
   const handleSave = async () => {
-    setSaving(true)
-    setSaveError("")
-    setSaveSuccess(false)
+    setSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
 
     try {
-      const resultado = await actualizarConfiguracion(formData)
+      const resultado = await actualizarConfiguracion(formData);
+
+      console.log("Resultado de la actualización:", resultado);
 
       if (resultado.ok) {
-        await mutate()
-        setEditMode(false)
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 3000)
+        await mutate();
+        setEditMode(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
       } else {
-        setSaveError(resultado.message || "Error al guardar la configuración")
+        // Mostrar el mensaje de error del servicio
+        setSaveError(resultado.message || "Error desconocido");
+
+        // Si hay errores de validación específicos, mostrarlos
+        if (resultado.errors && Array.isArray(resultado.errors)) {
+          const erroresDetallados = resultado.errors
+            .map((err: any) => `${err.loc?.join('.')}: ${err.msg}`)
+            .join('\n');
+          console.log("Errores detallados:", erroresDetallados);
+        }
       }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Error al guardar configuración")
+      console.error("Error en handleSave:", err);
+      if (err instanceof Error) {
+        setSaveError(err.message);
+      } else {
+        setSaveError("Error inesperado al guardar");
+      }
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const handleCancel = () => {
     setEditMode(false)
@@ -131,7 +147,9 @@ export function ConfigPanel() {
         {saveError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{saveError}</AlertDescription>
+            <AlertDescription>
+              {saveError} {/* ✅ Ahora saveError es siempre string */}
+            </AlertDescription>
           </Alert>
         )}
 

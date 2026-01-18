@@ -22,11 +22,10 @@ export async function obtenerEspacios() {
     throw error;
   }
 }
-
 // ============================
 // 📌 Registrar entrada de un vehículo
 // ============================
-export async function registrarEntrada(placa, espacioNumero) {
+export async function registrarEntrada(placa, espacioNumero, esNocturno = false) {
   const response = await fetch(`${VEHICULO_URL}/entrada`, {
     method: "POST",
     headers: {
@@ -35,6 +34,7 @@ export async function registrarEntrada(placa, espacioNumero) {
     body: JSON.stringify({
       placa: placa.toUpperCase().trim(),
       espacio_numero: espacioNumero,
+      es_nocturno: esNocturno,  // NUEVO
     }),
   });
 
@@ -57,7 +57,6 @@ export async function registrarEntrada(placa, espacioNumero) {
     data,
   };
 }
-
 // ============================
 // 📌 Registrar salida de un vehículo
 // ============================

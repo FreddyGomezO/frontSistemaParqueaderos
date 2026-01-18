@@ -123,3 +123,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer base {
+  :root {
+    /* Colores personalizados del Hotel La Farola */
+    --hotel-navy: #1a2942;
+    --hotel-gold: #d4a574;
+  }
+}
