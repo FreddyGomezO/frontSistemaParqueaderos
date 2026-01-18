@@ -56,6 +56,7 @@ export function ParkingGrid() {
       })
     }
   })
+  
 
   // Obtener configuración
   const { data: config } = useSWR<Configuracion>("configuracion", obtenerConfiguracion)
@@ -74,6 +75,85 @@ export function ParkingGrid() {
     accion: () => void
     cancelar: () => void
   } | null>(null)
+
+  // ✅ NUEVO: Función para formatear la placa automáticamente
+  const formatearPlaca = (valor: string): string => {
+    // Eliminar todos los caracteres no alfanuméricos excepto guiones
+    let limpio = valor.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase()
+    
+    // Si ya tiene un guión, dividir en partes
+    if (limpio.includes("-")) {
+      const partes = limpio.split("-")
+      let letras = partes[0].replace(/[^A-Z]/g, "").slice(0, 3) // Máximo 3 letras
+      let numeros = partes[1].replace(/[^0-9]/g, "").slice(0, 4) // Máximo 4 números
+      
+      // Si no hay números después del guión, quitarlo
+      if (numeros.length === 0) {
+        return letras
+      }
+      
+      return `${letras}-${numeros}`
+    } else {
+      // Sin guión aún
+      let letras = limpio.replace(/[^A-Z]/g, "").slice(0, 3)
+      let numeros = limpio.replace(/[^0-9]/g, "").slice(0, 4)
+      
+      // Si ya hay 3 letras y hay números, agregar guión automáticamente
+      if (letras.length === 3 && numeros.length > 0) {
+        return `${letras}-${numeros}`
+      }
+      
+      // Si hay menos de 3 letras y el usuario está escribiendo números
+      // y ya tiene algunas letras, agregar guión
+      if (letras.length > 0 && limpio.length > letras.length) {
+        const caracteresRestantes = limpio.slice(letras.length)
+        const numerosEnResto = caracteresRestantes.replace(/[^0-9]/g, "")
+        if (numerosEnResto.length > 0) {
+          return `${letras}-${numerosEnResto.slice(0, 4)}`
+        }
+      }
+      
+      return letras + (numeros.length > 0 ? "-" + numeros : "")
+    }
+  }
+  
+
+  // ✅ NUEVO: Función para manejar el cambio en el input de placa
+  const handlePlacaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value
+    const formateado = formatearPlaca(valor)
+    setPlaca(formateado)
+    
+    // Validar el formato final
+    const formatoValido = validarFormatoPlaca(formateado)
+    if (valor && !formatoValido) {
+      setSubmitError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+    } else {
+      setSubmitError("")
+    }
+  }
+
+  // ✅ NUEVO: Función para validar el formato de placa
+  const validarFormatoPlaca = (placa: string): boolean => {
+    if (!placa.trim()) return false
+    
+    // Patrón para placas ecuatorianas: 3 letras, guión, 3 o 4 números
+    const patron = /^[A-Z]{3}-\d{3,4}$/
+    return patron.test(placa)
+  }
+
+  // ✅ NUEVO: Función para formatear placa al perder el foco (blur)
+  const handlePlacaBlur = () => {
+    if (placa.trim()) {
+      const formateado = formatearPlaca(placa)
+      setPlaca(formateado)
+      
+      // Si después de formatear no cumple el formato, mostrar error
+      if (!validarFormatoPlaca(formateado)) {
+        setSubmitError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+      }
+    }
+  }
 
   // Función para verificar si estamos en horario nocturno
   const estaEnHorarioNocturno = (): boolean => {
@@ -106,21 +186,49 @@ export function ParkingGrid() {
     }
   }
 
-  const handleEspacioClick = (espacio: Espacio) => {
-    if (!espacio.ocupado) {
-      setSelectedEspacio(espacio.numero)
-      setPlaca("")
-
-      // ✅ Activar automáticamente si está en horario nocturno
-      const enHorarioNocturno = estaEnHorarioNocturno()
-      setEsNocturno(enHorarioNocturno) // Activar automáticamente en horario nocturno
-
-      // Solo mostrar advertencia si NO está en horario nocturno pero activa manualmente
-      setMostrarAdvertenciaNocturno(false)
-      setSubmitError("")
-      setDialogOpen(true)
-    }
+const handleEspacioClick = (espacio: Espacio) => {
+  if (!espacio.ocupado) {
+    setSelectedEspacio(espacio.numero)
+    setPlaca("")
+    
+    // ✅ Activar automáticamente si está en horario nocturno
+    const enHorarioNocturno = estaEnHorarioNocturno()
+    setEsNocturno(enHorarioNocturno)
+    setMostrarAdvertenciaNocturno(false)
+    setSubmitError("")
+    setDialogOpen(true)
+  } else if (espacio.ocupado && espacio.placa) {
+    // ✅ NUEVO: Cuando se hace clic en un espacio ocupado, copiar la placa al portapapeles
+    // ✅ CORRECCIÓN: TypeScript sabe que espacio.placa no es null aquí
+    const placaParaCopiar = espacio.placa // ✅ Esto es seguro porque verificamos espacio.placa en el if
+    
+    navigator.clipboard.writeText(placaParaCopiar)
+      .then(() => {
+        toast.success("Placa copiada al portapapeles", {
+          description: `Placa ${placaParaCopiar} lista para pegar en salida`,
+          icon: <Info className="h-4 w-4" />,
+          duration: 3000,
+        })
+        
+        // ✅ Guardar en localStorage para auto-cargar
+        localStorage.setItem('ultimaPlacaCopiada', placaParaCopiar)
+        localStorage.setItem('placaParaSalida', placaParaCopiar)
+      })
+      .catch(err => {
+        console.error('Error al copiar al portapapeles:', err)
+        toast.error("Error al copiar placa", {
+          description: "Intente manualmente",
+          icon: <XCircle className="h-4 w-4" />,
+        })
+      })
+  } else if (espacio.ocupado) {
+    // Caso: espacio ocupado pero sin placa
+    toast.warning("Espacio ocupado sin placa", {
+      description: "El espacio está ocupado pero no tiene placa registrada.",
+      icon: <AlertTriangle className="h-4 w-4" />,
+    })
   }
+}
 
   // Función para mostrar confirmación
   const mostrarConfirmacion = (mensaje: string, onConfirm: () => void, onCancel?: () => void): Promise<boolean> => {
@@ -144,11 +252,21 @@ export function ParkingGrid() {
   const handleRegistrarEntrada = async () => {
     if (!selectedEspacio || !placa.trim()) return
 
+    // ✅ NUEVO: Validar formato de placa antes de continuar
+    if (!validarFormatoPlaca(placa)) {
+      setSubmitError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+      toast.error("Error en formato de placa", {
+        description: "La placa debe tener el formato: 3 letras, guión, 3 o 4 números (ej: ABC-1234)",
+        icon: <XCircle className="h-4 w-4" />,
+      })
+      return
+    }
+
     // Si está marcado como nocturno pero fuera de horario, mostrar confirmación
     const enHorarioNocturno = estaEnHorarioNocturno()
     
     if (esNocturno && !enHorarioNocturno) {
-      const mensajeConfirmacion = `⚠️ ATENCIÓN - EXCEPCIÓN DE TARIFA\n\n` +
+      const mensajeConfirmacion = `ATENCIÓN - EXCEPCIÓN DE TARIFA\n\n` +
         `Está marcando un vehículo como NOCTURNO fuera del horario establecido.\n\n` +
         `• Horario nocturno: ${config?.hora_inicio_nocturno} - ${config?.hora_fin_nocturno}\n` +
         `• Hora actual: ${new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}\n` +
@@ -369,8 +487,8 @@ export function ParkingGrid() {
             
             ${esNocturno ?
           (estaEnHorarioNocturno() ?
-            '<div class="nocturno">⚠️ TARIFA NOCTURNA ⚠️</div>' :
-            '<div class="excepcion">⚠️ TARIFA NOCTURNA (EXCEPCIÓN)</div>'
+            '<div class="nocturno">TARIFA NOCTURNA</div>' :
+            '<div class="excepcion">TARIFA NOCTURNA (EXCEPCIÓN)</div>'
           ) :
           ''
         }
@@ -415,7 +533,7 @@ ticket generara una perdida
 de 10.00$
             </div>
             ${esNocturno && !estaEnHorarioNocturno() ?
-          '<div class="info-extra">⚠️ Tarifa nocturna aplicada como excepción</div>' :
+          '<div class="info-extra">Tarifa nocturna aplicada como excepción</div>' :
           ''
         }
           </body>
@@ -669,15 +787,20 @@ de 10.00$
                 id="placa"
                 placeholder="ABC-1234"
                 value={placa}
-                onChange={(e) => setPlaca(e.target.value.toUpperCase())}
+                onChange={handlePlacaChange} // ✅ CORRECCIÓN: Usar la nueva función
+                onBlur={handlePlacaBlur} // ✅ NUEVO: Formatear al perder foco
                 className="font-mono text-lg uppercase"
-                maxLength={10}
+                maxLength={8} // AAA-1234 = 8 caracteres
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && placa.trim() && !submitting) {
                     handleRegistrarEntrada()
                   }
                 }}
               />
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                <span>Formato: 3 letras, guión, 3 o 4 números (ej: ABC-1234)</span>
+              </div>
             </div>
 
             {/* Switch SIEMPRE visible */}
@@ -721,7 +844,7 @@ de 10.00$
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div className="text-amber-700 text-sm">
-                    <strong className="block mb-1">⚠️ Excepción de tarifa</strong>
+                    <strong className="block mb-1">Excepción de tarifa</strong>
                     <p>Está marcando tarifa nocturna fuera del horario establecido.</p>
                     <p className="mt-1">Solo use esta opción para clientes especiales que permanecerán toda la noche.</p>
                   </div>
@@ -770,7 +893,7 @@ de 10.00$
             </Button>
             <Button
               onClick={handleRegistrarEntrada}
-              disabled={!placa.trim() || submitting}
+              disabled={!placa.trim() || submitting || !validarFormatoPlaca(placa)} // ✅ NUEVO: Deshabilitar si el formato no es válido
               className={esNocturno ? "bg-amber-600 hover:bg-amber-700" : ""}
             >
               {submitting
@@ -790,7 +913,7 @@ de 10.00$
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-700">
               <AlertTriangle className="h-5 w-5" />
-              ⚠️ ATENCIÓN - EXCEPCIÓN DE TARIFA
+              ATENCIÓN - EXCEPCIÓN DE TARIFA
             </DialogTitle>
             <DialogDescription className="text-amber-600">
               Está marcando un vehículo como NOCTURNO fuera del horario establecido.

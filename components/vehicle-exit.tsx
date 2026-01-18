@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, Clock, DollarSign, Car, Printer, Moon } from "lucide-react"
+import { Search, Clock, DollarSign, Car, Printer, Moon, Info } from "lucide-react"
 import { useSWRConfig } from "swr"
 
 // Tipos
@@ -64,8 +64,94 @@ export function VehicleExit() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const facturaRef = useRef<HTMLDivElement>(null)
 
+  // ✅ NUEVO: Función para formatear la placa automáticamente
+  const formatearPlaca = (valor: string): string => {
+    // Eliminar todos los caracteres no alfanuméricos excepto guiones
+    let limpio = valor.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase()
+    
+    // Si ya tiene un guión, dividir en partes
+    if (limpio.includes("-")) {
+      const partes = limpio.split("-")
+      let letras = partes[0].replace(/[^A-Z]/g, "").slice(0, 3) // Máximo 3 letras
+      let numeros = partes[1].replace(/[^0-9]/g, "").slice(0, 4) // Máximo 4 números
+      
+      // Si no hay números después del guión, quitarlo
+      if (numeros.length === 0) {
+        return letras
+      }
+      
+      return `${letras}-${numeros}`
+    } else {
+      // Sin guión aún
+      let letras = limpio.replace(/[^A-Z]/g, "").slice(0, 3)
+      let numeros = limpio.replace(/[^0-9]/g, "").slice(0, 4)
+      
+      // Si ya hay 3 letras y hay números, agregar guión automáticamente
+      if (letras.length === 3 && numeros.length > 0) {
+        return `${letras}-${numeros}`
+      }
+      
+      // Si hay menos de 3 letras y el usuario está escribiendo números
+      // y ya tiene algunas letras, agregar guión
+      if (letras.length > 0 && limpio.length > letras.length) {
+        const caracteresRestantes = limpio.slice(letras.length)
+        const numerosEnResto = caracteresRestantes.replace(/[^0-9]/g, "")
+        if (numerosEnResto.length > 0) {
+          return `${letras}-${numerosEnResto.slice(0, 4)}`
+        }
+      }
+      
+      return letras + (numeros.length > 0 ? "-" + numeros : "")
+    }
+  }
+
+  // ✅ NUEVO: Función para manejar el cambio en el input de placa
+  const handlePlacaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value
+    const formateado = formatearPlaca(valor)
+    setPlaca(formateado)
+    
+    // Validar el formato final
+    const formatoValido = validarFormatoPlaca(formateado)
+    if (valor && !formatoValido) {
+      setError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+    } else {
+      setError("")
+    }
+  }
+
+  // ✅ NUEVO: Función para validar el formato de placa
+  const validarFormatoPlaca = (placa: string): boolean => {
+    if (!placa.trim()) return false
+    
+    // Patrón para placas ecuatorianas: 3 letras, guión, 3 o 4 números
+    const patron = /^[A-Z]{3}-\d{3,4}$/
+    return patron.test(placa)
+  }
+
+  // ✅ NUEVO: Función para formatear placa al perder el foco (blur)
+  const handlePlacaBlur = () => {
+    if (placa.trim()) {
+      const formateado = formatearPlaca(placa)
+      setPlaca(formateado)
+      
+      // Si después de formatear no cumple el formato, mostrar error
+      if (!validarFormatoPlaca(formateado)) {
+        setError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+      } else {
+        setError("")
+      }
+    }
+  }
+
   const handleBuscar = async () => {
     if (!placa.trim()) return
+
+    // ✅ NUEVO: Validar formato de placa antes de buscar
+    if (!validarFormatoPlaca(placa)) {
+      setError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
+      return
+    }
 
     setSearching(true)
     setError("")
@@ -185,6 +271,15 @@ export function VehicleExit() {
               color: #dc2626;
               font-weight: bold;
               margin: 4px 0;
+              background: #fee2e2;
+              padding: 2px;
+              border-radius: 2px;
+            }
+            .info-extra {
+              font-size: 11px;
+              text-align: center;
+              margin: 4px 0;
+              color: #666;
             }
           </style>
         </head>
@@ -237,6 +332,11 @@ export function VehicleExit() {
             Gracias por su visita<br>
             ${new Date().toLocaleString("es-EC")}
           </div>
+          
+          ${factura.es_nocturno ? 
+            '<div class="info-extra">⚠️ Tarifa nocturna fija aplicada</div>' : 
+            ''
+          }
         </body>
       </html>
     `)
@@ -268,24 +368,35 @@ export function VehicleExit() {
           <CardDescription>Busque un vehículo por su placa para registrar la salida y generar factura</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="buscar-placa" className="sr-only">
-                Placa
-              </Label>
-              <Input
-                id="buscar-placa"
-                placeholder="Ingrese la placa (ej: ABC-1234)"
-                value={placa}
-                onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-                className="font-mono text-lg uppercase"
-                onKeyDown={(e) => e.key === "Enter" && !searching && handleBuscar()}
-              />
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label htmlFor="buscar-placa" className="sr-only">
+                  Placa
+                </Label>
+                <Input
+                  id="buscar-placa"
+                  placeholder="Ingrese la placa (ej: ABC-1234)"
+                  value={placa}
+                  onChange={handlePlacaChange} // ✅ CORRECCIÓN: Usar la nueva función
+                  onBlur={handlePlacaBlur} // ✅ NUEVO: Formatear al perder foco
+                  className="font-mono text-lg uppercase"
+                  maxLength={8} // AAA-1234 = 8 caracteres
+                  onKeyDown={(e) => e.key === "Enter" && !searching && handleBuscar()}
+                />
+              </div>
+              <Button 
+                onClick={handleBuscar} 
+                disabled={!placa.trim() || searching || !validarFormatoPlaca(placa)} // ✅ NUEVO: Deshabilitar si formato no válido
+              >
+                <Search className="h-4 w-4 mr-2" />
+                {searching ? "Buscando..." : "Buscar"}
+              </Button>
             </div>
-            <Button onClick={handleBuscar} disabled={!placa.trim() || searching}>
-              <Search className="h-4 w-4 mr-2" />
-              {searching ? "Buscando..." : "Buscar"}
-            </Button>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" />
+              <span>Formato: 3 letras, guión, 3 o 4 números (ej: ABC-1234)</span>
+            </div>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -424,6 +535,12 @@ export function VehicleExit() {
                   <span>Tiempo:</span>
                   <span>{factura.tiempo_total}</span>
                 </div>
+                {factura.es_nocturno && (
+                  <div className="row flex justify-between">
+                    <span>Tarifa:</span>
+                    <span className="font-medium text-amber-600">NOCTURNA</span>
+                  </div>
+                )}
               </div>
 
               <div className="divider border-t border-dashed my-2" />
