@@ -650,7 +650,7 @@ const handleEspacioClick = (espacio: Espacio) => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-            {Array.from({ length: 15 }).map((_, i) => (
+            {Array.from({ length: 24 }).map((_, i) => (
               <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />
             ))}
           </div>
@@ -673,7 +673,7 @@ const handleEspacioClick = (espacio: Espacio) => {
   }
 
   const espaciosOcupados = espacios?.filter((e) => e.ocupado).length || 0
-  const espaciosLibres = 15 - espaciosOcupados
+  const espaciosLibres = 24 - espaciosOcupados
 
   // ✅ NUEVO: Contar vehículos nocturnos vs normales
   const vehiculosNocturnos = espacios?.filter(e => e.ocupado && e.es_nocturno).length || 0
