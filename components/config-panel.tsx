@@ -1,14 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { obtenerConfiguracion, actualizarConfiguracion } from "@/servicios/configuracionService"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Settings, Save, Clock, DollarSign, AlertCircle } from "lucide-react"
+import { Settings, Save, Clock, DollarSign, AlertCircle, Lock, Eye, EyeOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // Tipo para la configuración
 interface Configuracion {
@@ -21,13 +29,66 @@ interface Configuracion {
   actualizado_en: string | null
 }
 
+// ✅ CONTRASEÑA DE ACCESO (Cámbiala por la que quieras)
+const PASSWORD_ADMIN = "admin2024"
+
 export function ConfigPanel() {
   const { data: config, error, isLoading, mutate } = useSWR<Configuracion>("configuracion", obtenerConfiguracion)
+  
+  // Estados de autenticación
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [passwordInput, setPasswordInput] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [attemptCount, setAttemptCount] = useState(0)
+  
+  // Estados de edición
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string>("") // <-- Especifica string
+  const [saveError, setSaveError] = useState<string>("")
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [formData, setFormData] = useState<Partial<Configuracion>>({})
+
+  // ✅ Verificar si ya está autenticado en esta sesión
+  useEffect(() => {
+    const authSession = sessionStorage.getItem('config_authenticated')
+    if (authSession === 'true') {
+      setIsAuthenticated(true)
+    } else {
+      // Mostrar diálogo de contraseña al cargar el componente
+      setShowPasswordDialog(true)
+    }
+  }, [])
+
+  // ✅ Manejar verificación de contraseña
+  const handlePasswordSubmit = () => {
+    if (passwordInput === PASSWORD_ADMIN) {
+      setIsAuthenticated(true)
+      setShowPasswordDialog(false)
+      setPasswordError("")
+      setPasswordInput("")
+      setAttemptCount(0)
+      // Guardar en sessionStorage (se borra al cerrar la pestaña)
+      sessionStorage.setItem('config_authenticated', 'true')
+    } else {
+      const newAttemptCount = attemptCount + 1
+      setAttemptCount(newAttemptCount)
+      setPasswordError(`Contraseña incorrecta. Intentos: ${newAttemptCount}/3`)
+      
+      // Después de 3 intentos, bloquear temporalmente
+      if (newAttemptCount >= 3) {
+        setPasswordError("Demasiados intentos fallidos. Recarga la página para intentar de nuevo.")
+        setPasswordInput("")
+        // Opcionalmente, puedes cerrar el diálogo después de 3 segundos
+        setTimeout(() => {
+          setShowPasswordDialog(false)
+        }, 3000)
+      } else {
+        setPasswordInput("")
+      }
+    }
+  }
 
   const handleEdit = () => {
     if (config) {
@@ -45,49 +106,44 @@ export function ConfigPanel() {
   }
 
   const handleSave = async () => {
-    setSaving(true);
-    setSaveError("");
-    setSaveSuccess(false);
+    setSaving(true)
+    setSaveError("")
+    setSaveSuccess(false)
 
     try {
-      const resultado = await actualizarConfiguracion(formData);
-
-      console.log("Resultado de la actualización:", resultado);
+      const resultado = await actualizarConfiguracion(formData)
 
       if (resultado.ok) {
-        await mutate();
-        setEditMode(false);
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        await mutate()
+        setEditMode(false)
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 3000)
       } else {
-        // Mostrar el mensaje de error del servicio
-        setSaveError(resultado.message || "Error desconocido");
-
-        // Si hay errores de validación específicos, mostrarlos
-        if (resultado.errors && Array.isArray(resultado.errors)) {
-          const erroresDetallados = resultado.errors
-            .map((err: any) => `${err.loc?.join('.')}: ${err.msg}`)
-            .join('\n');
-          console.log("Errores detallados:", erroresDetallados);
-        }
+        setSaveError(resultado.message || "Error desconocido")
       }
     } catch (err) {
-      console.error("Error en handleSave:", err);
       if (err instanceof Error) {
-        setSaveError(err.message);
+        setSaveError(err.message)
       } else {
-        setSaveError("Error inesperado al guardar");
+        setSaveError("Error inesperado al guardar")
       }
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleCancel = () => {
     setEditMode(false)
     setFormData({})
     setSaveError("")
     setSaveSuccess(false)
+  }
+
+  // ✅ Función para cerrar sesión
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    sessionStorage.removeItem('config_authenticated')
+    setShowPasswordDialog(true)
   }
 
   if (isLoading) {
@@ -116,6 +172,114 @@ export function ConfigPanel() {
     )
   }
 
+  // ✅ Si no está autenticado, mostrar solo el diálogo
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-amber-600" />
+              Acceso Restringido
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+                <Lock className="h-8 w-8 text-amber-600" />
+              </div>
+              <p className="text-muted-foreground mb-4">
+                Esta sección requiere autenticación de administrador
+              </p>
+              <Button onClick={() => setShowPasswordDialog(true)}>
+                <Lock className="h-4 w-4 mr-2" />
+                Ingresar Contraseña
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Diálogo de contraseña */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-amber-600" />
+                Acceso a Configuración
+              </DialogTitle>
+              <DialogDescription>
+                Ingrese la contraseña de administrador para acceder a la configuración de precios
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña de Administrador</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Ingrese la contraseña"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && passwordInput.trim() && attemptCount < 3) {
+                        handlePasswordSubmit()
+                      }
+                    }}
+                    className="pl-10 pr-10"
+                    disabled={attemptCount >= 3}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600 transition-colors"
+                    disabled={attemptCount >= 3}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {passwordError && (
+                <Alert variant={attemptCount >= 3 ? "destructive" : "default"}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{passwordError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowPasswordDialog(false)
+                  setPasswordInput("")
+                  setPasswordError("")
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handlePasswordSubmit}
+                disabled={!passwordInput.trim() || attemptCount >= 3}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                Verificar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    )
+  }
+
+  // ✅ Si está autenticado, mostrar el panel normal
   return (
     <Card>
       <CardHeader>
@@ -127,11 +291,22 @@ export function ConfigPanel() {
             </CardTitle>
             <CardDescription>Ajuste las tarifas del parqueadero</CardDescription>
           </div>
-          {!editMode && (
-            <Button variant="outline" onClick={handleEdit}>
-              Editar
+          <div className="flex gap-2">
+            {!editMode && (
+              <Button variant="outline" onClick={handleEdit}>
+                Editar
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleLogout}
+              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            >
+              <Lock className="h-4 w-4 mr-1" />
+              Cerrar Sesión
             </Button>
-          )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -147,9 +322,7 @@ export function ConfigPanel() {
         {saveError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {saveError} {/* ✅ Ahora saveError es siempre string */}
-            </AlertDescription>
+            <AlertDescription>{saveError}</AlertDescription>
           </Alert>
         )}
 
