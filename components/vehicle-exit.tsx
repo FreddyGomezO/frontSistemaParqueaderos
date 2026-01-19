@@ -68,29 +68,29 @@ export function VehicleExit() {
   const formatearPlaca = (valor: string): string => {
     // Eliminar todos los caracteres no alfanuméricos excepto guiones
     let limpio = valor.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase()
-    
+
     // Si ya tiene un guión, dividir en partes
     if (limpio.includes("-")) {
       const partes = limpio.split("-")
       let letras = partes[0].replace(/[^A-Z]/g, "").slice(0, 3) // Máximo 3 letras
       let numeros = partes[1].replace(/[^0-9]/g, "").slice(0, 4) // Máximo 4 números
-      
+
       // Si no hay números después del guión, quitarlo
       if (numeros.length === 0) {
         return letras
       }
-      
+
       return `${letras}-${numeros}`
     } else {
       // Sin guión aún
       let letras = limpio.replace(/[^A-Z]/g, "").slice(0, 3)
       let numeros = limpio.replace(/[^0-9]/g, "").slice(0, 4)
-      
+
       // Si ya hay 3 letras y hay números, agregar guión automáticamente
       if (letras.length === 3 && numeros.length > 0) {
         return `${letras}-${numeros}`
       }
-      
+
       // Si hay menos de 3 letras y el usuario está escribiendo números
       // y ya tiene algunas letras, agregar guión
       if (letras.length > 0 && limpio.length > letras.length) {
@@ -100,7 +100,7 @@ export function VehicleExit() {
           return `${letras}-${numerosEnResto.slice(0, 4)}`
         }
       }
-      
+
       return letras + (numeros.length > 0 ? "-" + numeros : "")
     }
   }
@@ -110,7 +110,7 @@ export function VehicleExit() {
     const valor = e.target.value
     const formateado = formatearPlaca(valor)
     setPlaca(formateado)
-    
+
     // Validar el formato final
     const formatoValido = validarFormatoPlaca(formateado)
     if (valor && !formatoValido) {
@@ -123,7 +123,7 @@ export function VehicleExit() {
   // ✅ NUEVO: Función para validar el formato de placa
   const validarFormatoPlaca = (placa: string): boolean => {
     if (!placa.trim()) return false
-    
+
     // Patrón para placas ecuatorianas: 3 letras, guión, 3 o 4 números
     const patron = /^[A-Z]{3}-\d{3,4}$/
     return patron.test(placa)
@@ -134,7 +134,7 @@ export function VehicleExit() {
     if (placa.trim()) {
       const formateado = formatearPlaca(placa)
       setPlaca(formateado)
-      
+
       // Si después de formatear no cumple el formato, mostrar error
       if (!validarFormatoPlaca(formateado)) {
         setError("Formato de placa inválido. Use: AAA-123 o AAA-1234")
@@ -159,7 +159,7 @@ export function VehicleExit() {
 
     try {
       const result = await buscarVehiculo(placa.trim())
-      
+
       // El backend retorna { success: true, data: {...} }
       if (result && result.success && result.data) {
         setVehiculo(result.data)
@@ -184,7 +184,7 @@ export function VehicleExit() {
 
     try {
       const result = await registrarSalida(vehiculo.placa)
-      
+
       if (result.ok && result.data) {
         setFactura(result.data.factura)
         setDialogOpen(true)
@@ -208,145 +208,228 @@ export function VehicleExit() {
     const salida = new Date(factura.salida)
 
     const fEntrada = entrada.toLocaleDateString("es-EC")
-    const hEntrada = entrada.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
+    const hEntrada = entrada.toLocaleTimeString("es-EC", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })
 
     const fSalida = salida.toLocaleDateString("es-EC")
-    const hSalida = salida.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: true })
+    const hSalida = salida.toLocaleTimeString("es-EC", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })
 
-    const printWindow = window.open("", "", "width=400,height=600")
-    if (!printWindow) return
+    const printWindow = window.open("", "_blank", "width=72mm,height=600")
+    if (!printWindow) {
+      console.error("No se pudo abrir ventana de impresión")
+      return
+    }
 
     printWindow.document.write(`
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Ticket Salida</title>
-          <style>
-            @page {
-              size: 80mm auto;
-              margin: 2mm;
-            }
-            body {
-              font-family: 'Courier New', monospace;
-              font-size: 13px;
-              margin: 0;
-              padding: 2mm;
-              width: 70mm;
-              line-height: 1.3;
-            }
-            .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .placa {
-              text-align: center;
-              font-size: 22px;
-              font-weight: bold;
-              letter-spacing: 2px;
-              margin: 6px 0;
-              border: 2px solid #000;
-              padding: 5px;
-            }
-            hr {
-              border: 0;
-              border-top: 1px dashed #000;
-              margin: 5px 0;
-            }
-            table {
-              width: 100%;
-              font-size: 13px;
-            }
-            td {
-              padding: 2px 0;
-            }
-            .total {
-              font-size: 18px;
-              font-weight: bold;
-            }
-            .mensaje {
-              text-align: center;
-              font-size: 12px;
-              margin-top: 6px;
-            }
-            .nocturno {
-              text-align: center;
-              color: #dc2626;
-              font-weight: bold;
-              margin: 4px 0;
-              background: #fee2e2;
-              padding: 2px;
-              border-radius: 2px;
-            }
-            .info-extra {
-              font-size: 11px;
-              text-align: center;
-              margin: 4px 0;
-              color: #666;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="center bold">${HOTEL_INFO.nombre}</div>
-          <div class="center">Sistema de Parqueadero</div>
-          <hr>
-
-          <div class="center bold">TICKET DE SALIDA</div>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Ticket de Salida</title>
+        <style>
+          /* ESTILO SIMPLE SIN COLORES - SOLO TEXTO */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+          }
           
-          ${factura.es_nocturno ? '<div class="nocturno">⚠️ TARIFA NOCTURNA ⚠️</div>' : ''}
-
-          <div class="placa">${factura.placa}</div>
-          <div class="center bold">ESPACIO #${factura.espacio}</div>
-
-          <hr>
-
-          <table>
-            <tr>
-              <td>Entrada:</td>
-              <td align="right">${fEntrada} ${hEntrada}</td>
-            </tr>
-            <tr>
-              <td>Salida:</td>
-              <td align="right">${fSalida} ${hSalida}</td>
-            </tr>
-            <tr>
-              <td>Tiempo:</td>
-              <td align="right">${factura.tiempo_total}</td>
-            </tr>
-            ${factura.es_nocturno ? 
-              '<tr><td>Tarifa:</td><td align="right"><strong>NOCTURNA</strong></td></tr>' : 
-              ''
+          body {
+            width: 72mm;
+            margin: 0;
+            padding: 2mm;
+            font-size: 11px;
+            line-height: 1.2;
+          }
+          
+          @media print {
+            @page {
+              size: 72mm auto;
+              margin: 0;
             }
-          </table>
-
-          <hr>
-
-          <table>
-            <tr class="total">
-              <td>TOTAL:</td>
-              <td align="right">$${factura.costo_total.toFixed(2)}</td>
-            </tr>
-          </table>
-
-          <hr>
-
-          <div class="mensaje">
-            ${factura.detalles}<br>
-            Gracias por su visita<br>
-            ${new Date().toLocaleString("es-EC")}
+            
+            body {
+              width: 72mm !important;
+              margin: 0 !important;
+              padding: 2mm !important;
+            }
+          }
+          
+          .ticket {
+            width: 100%;
+            text-align: left;
+          }
+          
+          .center {
+            text-align: center;
+          }
+          
+          .separator {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 3px 0;
+          }
+          
+          .placa {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 4px 0;
+            text-align: center;
+          }
+          
+          .espacio {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 3px 0;
+            text-align: center;
+          }
+          
+          .tarifa {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 4px 0;
+            text-align: center;
+          }
+          
+          .info-table {
+            width: 100%;
+            margin: 5px 0;
+          }
+          
+          .info-table td {
+            padding: 1px 0;
+            vertical-align: top;
+          }
+          
+          .total {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin: 8px 0;
+          }
+          
+          .footer {
+            font-size: 9px;
+            margin-top: 6px;
+            padding-top: 4px;
+            border-top: 1px dashed #000;
+            text-align: center;
+            line-height: 1.3;
+          }
+          
+          /* ESTILOS PARA TEXTO ESPECÍFICO */
+          .bold {
+            font-weight: bold;
+          }
+          
+          .small {
+            font-size: 9px;
+          }
+          
+          .medium {
+            font-size: 11px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <!-- HEADER -->
+          <div class="center">
+            <div class="bold medium">TICKET DE SALIDA</div>
+            <div>Sistema de Parqueadero</div>
           </div>
           
-          ${factura.es_nocturno ? 
-            '<div class="info-extra">⚠️ Tarifa nocturna fija aplicada</div>' : 
-            ''
-          }
-        </body>
-      </html>
-    `)
+          <div class="separator"></div>
+          
+          <!-- TARIFA SI ES NOCTURNA -->
+          ${factura.es_nocturno ? `
+            <div class="tarifa">TARIFA NOCTURNA</div>
+          ` : ''}
+          
+          <!-- PLACA Y ESPACIO -->
+          <div class="placa">${factura.placa}</div>
+          <div class="espacio">ESPACIO #${factura.espacio}</div>
+          
+          <div class="separator"></div>
+          
+          <!-- INFORMACIÓN -->
+          <table class="info-table">
+            <tr>
+              <td class="bold">Fecha entrada:</td>
+              <td>${fEntrada}</td>
+            </tr>
+            <tr>
+              <td class="bold">Hora entrada:</td>
+              <td>${hEntrada}</td>
+            </tr>
+            <tr>
+              <td class="bold">Fecha salida:</td>
+              <td>${fSalida}</td>
+            </tr>
+            <tr>
+              <td class="bold">Hora salida:</td>
+              <td>${hSalida}</td>
+            </tr>
+            <tr>
+              <td class="bold">Tiempo total:</td>
+              <td>${factura.tiempo_total}</td>
+            </tr>
+            ${factura.es_nocturno ? `
+              <tr>
+                <td class="bold">Tarifa:</td>
+                <td>NOCTURNA</td>
+              </tr>
+            ` : ''}
+          </table>
+          
+          <div class="separator"></div>
+          
+          <!-- DETALLES -->
+          <div class="small">
+            ${factura.detalles.replace(/\n/g, '<br>')}
+            ${factura.es_nocturno ? '<br>⭐ Tarifa nocturna fija aplicada' : ''}
+          </div>
+          
+          <div class="separator"></div>
+          
+          <!-- TOTAL -->
+          <div class="total">
+            TOTAL: $${factura.costo_total.toFixed(2)}
+          </div>
+          
+          <div class="separator"></div>
+          
+          <!-- FOOTER -->
+          <div class="footer">
+            <div><span class="bold">Generado:</span> ${new Date().toLocaleString("es-EC")}</div>
+            <div class="bold">Hotel La Farola - Parqueadero</div>
+            <div>Gracias por su visita</div>
+          </div>
+        </div>
+      </body>
+    </html>
+  `)
 
     printWindow.document.close()
 
+    // Imprimir automáticamente después de cargar
     setTimeout(() => {
       printWindow.print()
-      setTimeout(() => printWindow.close(), 100)
-    }, 400)
+      // Cerrar ventana después de imprimir
+      setTimeout(() => {
+        if (!printWindow.closed) {
+          printWindow.close()
+        }
+      }, 1000)
+    }, 500)
   }
 
   const formatDateTime = (isoString: string) => {
@@ -385,8 +468,8 @@ export function VehicleExit() {
                   onKeyDown={(e) => e.key === "Enter" && !searching && handleBuscar()}
                 />
               </div>
-              <Button 
-                onClick={handleBuscar} 
+              <Button
+                onClick={handleBuscar}
                 disabled={!placa.trim() || searching || !validarFormatoPlaca(placa)} // ✅ NUEVO: Deshabilitar si formato no válido
               >
                 <Search className="h-4 w-4 mr-2" />
@@ -455,16 +538,16 @@ export function VehicleExit() {
                 )}
               </div>
 
-              <Button 
-                onClick={handleRegistrarSalida} 
-                className={`w-full ${vehiculo.es_nocturno ? "bg-amber-600 hover:bg-amber-700" : ""}`} 
-                size="lg" 
+              <Button
+                onClick={handleRegistrarSalida}
+                className={`w-full ${vehiculo.es_nocturno ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                size="lg"
                 disabled={processing}
                 variant={vehiculo.es_nocturno ? "default" : "default"}
               >
-                {processing 
-                  ? "Procesando..." 
-                  : vehiculo.es_nocturno 
+                {processing
+                  ? "Procesando..."
+                  : vehiculo.es_nocturno
                     ? `Registrar Salida (Nocturno - $${vehiculo.costo_estimado.toFixed(2)})`
                     : "Registrar Salida y Generar Factura"
                 }
@@ -493,7 +576,7 @@ export function VehicleExit() {
                   </div>
                 </div>
               )}
-              
+
               <div className="header text-center border-b-2 border-dashed pb-3">
                 <p className="hotel-name text-lg font-bold">{HOTEL_INFO.nombre}</p>
                 <p className="info text-xs text-muted-foreground">{HOTEL_INFO.direccion}</p>

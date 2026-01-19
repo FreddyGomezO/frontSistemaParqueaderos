@@ -141,3 +141,25 @@ export function calcularTotales(reportes) {
     ingresos_total: totalIngresos,
   };
 }
+export async function obtenerReporteDetallado(fecha = null) {
+  try {
+    let url = `${REPORTE_URL}/detallado`;
+
+    if (fecha) {
+      url += `?fecha=${fecha}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error("Error al obtener el reporte detallado");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("❌ Error en obtenerReporteDetallado:", error);
+    throw error;
+  }
+}

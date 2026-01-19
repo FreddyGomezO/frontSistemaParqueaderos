@@ -373,192 +373,234 @@ const handleEspacioClick = (espacio: Espacio) => {
   }
 
   const imprimirTicketEntrada = (vehiculo: any, esNocturno: boolean) => {
-    const fechaEntrada = new Date(vehiculo.fecha_hora_entrada)
-    const fecha = fechaEntrada.toLocaleDateString("es-EC", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    })
-    const hora = fechaEntrada.toLocaleTimeString("es-EC", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true
-    })
+  const fechaEntrada = new Date(vehiculo.fecha_hora_entrada)
+  const fecha = fechaEntrada.toLocaleDateString("es-EC", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  })
+  const hora = fechaEntrada.toLocaleTimeString("es-EC", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  })
 
-    const printWindow = window.open("", "", "width=400,height=600")
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Ticket</title>
-            <style>
-              @page { 
-                size: 80mm auto;
-                margin: 2mm;
-              }
-              body { 
-                font-family: 'Courier New', monospace; 
-                font-size: 13px;
-                margin: 0;
-                padding: 2mm;
-                width: 70mm;
-                line-height: 1.3;
-              }
-              .center { 
-                text-align: center; 
-              }
-              .bold { 
-                font-weight: bold; 
-              }
-              .logo {
-                text-align: center;
-                margin: 8px 0 10px 0;
-              }
-              .logo img {
-                width: 120px;
-                height: auto;
-                object-fit: contain;
-              }
-              .placa {
-                text-align: center;
-                font-size: 22px;
-                font-weight: bold;
-                letter-spacing: 2px;
-                margin: 6px 0;
-                border: 2px solid #000;
-                padding: 5px;
-              }
-              hr {
-                border: 0;
-                border-top: 1px dashed #000;
-                margin: 5px 0;
-              }
-              table {
-                width: 100%;
-                margin: 4px 0;
-                font-size: 13px;
-              }
-              td {
-                padding: 2px 0;
-              }
-              .nocturno {
-                text-align: center;
-                color: #dc2626;
-                font-weight: bold;
-                margin: 4px 0;
-                background: #fee2e2;
-                padding: 2px;
-                border-radius: 2px;
-              }
-              .excepcion {
-                text-align: center;
-                color: #ea580c;
-                font-weight: bold;
-                margin: 4px 0;
-                background: #ffedd5;
-                padding: 2px;
-                border-radius: 2px;
-              }
-              .label {
-                width: 28%;
-              }
-              .mensaje {
-                text-align: center;
-                font-size: 12px;
-                line-height: 1.4;
-                margin-top: 4px;
-              }
-              .info-extra {
-                font-size: 11px;
-                text-align: center;
-                margin: 4px 0;
-                color: #666;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="logo">
-              <img src="${window.location.origin}/42dd1c4b-77e6-48fa-b3c1-df5bfd43fee7.png" alt="Hotel La Farola">
-            </div>
-            <div class="center">Sistema de Parqueadero</div>
-            <hr>
-            <div class="center bold">TICKET DE ENTRADA</div>
-            
-            ${esNocturno ?
-          (estaEnHorarioNocturno() ?
-            '<div class="nocturno">TARIFA NOCTURNA</div>' :
-            '<div class="excepcion">TARIFA NOCTURNA (EXCEPCIÓN)</div>'
-          ) :
-          ''
-        }
-            
-            <div class="placa">${vehiculo.placa}</div>
-            <div class="center bold">ESPACIO #${vehiculo.espacio_numero}</div>
-            <hr>
-            <table>
-              <tr>
-                <td class="label">Fecha:</td>
-                <td>${fecha}</td>
-              </tr>
-              <tr>
-                <td class="label">Hora:</td>
-                <td>${hora}</td>
-              </tr>
-              <tr>
-                <td class="label">Tarifa:</td>
-                <td><strong>${esNocturno ? 'NOCTURNA' : 'NORMAL'}</strong></td>
-              </tr>
-              ${esNocturno ?
-          `<tr>
-                  <td class="label">Precio:</td>
-                  <td><strong>$${config?.precio_nocturno || '10.00'}</strong></td>
-                 </tr>` :
-          `<tr>
-                  <td class="label">Media hora:</td>
-                  <td>$${config?.precio_media_hora || '0.50'}</td>
-                 </tr>
-                 <tr>
-                  <td class="label">Hora adicional:</td>
-                  <td>$${config?.precio_hora_adicional || '1.00'}</td>
-                 </tr>`
-        }
-            </table>
-            <hr>
-            <div class="mensaje">
-Entregue este comprobante
-para su salida. Parqueadero
-tarifado. La perdida de
-ticket generara una perdida
-de 10.00$
-            </div>
-            ${esNocturno && !estaEnHorarioNocturno() ?
-          '<div class="info-extra">Tarifa nocturna aplicada como excepción</div>' :
-          ''
-        }
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-
-      setTimeout(() => {
-        printWindow.print()
-        setTimeout(() => {
-          printWindow.close()
-          toast.success("Ticket impreso", {
-            description: "El ticket se ha enviado a la impresora",
-            icon: <Printer className="h-4 w-4" />,
-          })
-        }, 100)
-      }, 500)
-    } else {
-      toast.error("Error al imprimir", {
-        description: "No se pudo abrir la ventana de impresión. Verifique los bloqueadores de ventanas emergentes.",
-        icon: <XCircle className="h-4 w-4" />,
-      })
-    }
+  // Usar tamaño específico para impresora térmica
+  const printWindow = window.open("", "_blank", "width=72mm,height=600")
+  if (!printWindow) {
+    toast.error("No se pudo abrir ventana de impresión")
+    return
   }
 
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Ticket de Entrada</title>
+        <style>
+          /* ESTILO SIMPLE SIN COLORES - SOLO TEXTO */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace; /* Fuente de impresora térmica */
+          }
+          
+          body {
+            width: 72mm;
+            margin: 0;
+            padding: 2mm;
+            font-size: 11px;
+            line-height: 1.2;
+          }
+          
+          @media print {
+            @page {
+              size: 72mm auto;
+              margin: 0;
+            }
+            
+            body {
+              width: 72mm !important;
+              margin: 0 !important;
+              padding: 2mm !important;
+            }
+          }
+          
+          .ticket {
+            width: 100%;
+            text-align: left;
+          }
+          
+          .center {
+            text-align: center;
+          }
+          
+          .separator {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 3px 0;
+          }
+          
+          .placa {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 4px 0;
+            text-align: center;
+          }
+          
+          .espacio {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 3px 0;
+            text-align: center;
+          }
+          
+          .tarifa {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 4px 0;
+            text-align: center;
+          }
+          
+          .info-table {
+            width: 100%;
+            margin: 5px 0;
+          }
+          
+          .info-table td {
+            padding: 1px 0;
+            vertical-align: top;
+          }
+          
+          .warning {
+            font-size: 10px;
+            margin: 5px 0;
+            text-align: center;
+          }
+          
+          .footer {
+            font-size: 9px;
+            margin-top: 6px;
+            padding-top: 4px;
+            border-top: 1px dashed #000;
+            text-align: center;
+            line-height: 1.3;
+          }
+          
+          /* ESTILOS PARA TEXTO ESPECÍFICO */
+          .bold {
+            font-weight: bold;
+          }
+          
+          .small {
+            font-size: 9px;
+          }
+          
+          .medium {
+            font-size: 11px;
+          }
+          
+          /* ELIMINAR TODOS LOS COLORES Y FONDOS */
+          .nocturno, .excepcion, .normal {
+            background: none !important;
+            color: #000 !important;
+            border: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <!-- HEADER -->
+          <div class="center">
+            <img src="${window.location.origin}/42dd1c4b-77e6-48fa-b3c1-df5bfd43fee7.png" alt="Hotel Gran Plaza" style="max-width: 50mm; height: auto; margin-bottom: 3px;">
+            <div class="bold medium">TICKET DE ENTRADA</div>
+            <div>Sistema de Parqueadero</div>
+          </div>
+          
+          <div class="separator"></div>
+          
+          <!-- TARIFA -->
+          <div class="tarifa">TARIFA NOCTURNA</div>
+          
+          <!-- PLACA Y ESPACIO -->
+          <div class="placa">${vehiculo.placa}</div>
+          <div class="espacio">ESPACIO #${vehiculo.espacio_numero}</div>
+          
+          <div class="separator"></div>
+          
+          <!-- INFORMACIÓN -->
+          <table class="info-table">
+            <tr>
+              <td class="bold">Fecha:</td>
+              <td>${fecha}</td>
+            </tr>
+            <tr>
+              <td class="bold">Hora:</td>
+              <td>${hora}</td>
+            </tr>
+            <tr>
+              <td class="bold">Tarifa:</td>
+              <td>${esNocturno ? 'NOCTURNA' : 'NORMAL'}</td>
+            </tr>
+            <tr>
+              <td class="bold">Precio:</td>
+              <td>
+                ${esNocturno
+                  ? `$${config?.precio_nocturno || '10'}`
+                  : `$${config?.precio_media_hora || '0.50'} / media hora`
+                }
+              </td>
+            </tr>
+            ${!esNocturno ? `
+              <tr>
+                <td class="bold">Hora adicional:</td>
+                <td>$${config?.precio_hora_adicional || '1.00'}</td>
+              </tr>
+            ` : ''}
+          </table>
+          
+          <div class="separator"></div>
+          
+          <!-- ADVERTENCIA -->
+          <div class="warning">
+            <div class="bold">[CONSERVE ESTE TICKET]</div>
+            <div>Debe presentar este ticket para retirar su vehículo.</div>
+            <div class="bold">PERDIDA DEL TICKET: Multa de $10.00</div>
+          </div>
+          
+          <!-- MENSAJE DE EXCEPCIÓN SI APLICA -->
+          ${esNocturno && !estaEnHorarioNocturno() ? `
+            <div class="warning small">
+              ⚠️ Tarifa nocturna aplicada como excepción especial
+            </div>
+          ` : ''}
+          
+          <!-- FOOTER -->
+          <div class="footer">
+            <div><span class="bold">Generado:</span> ${new Date().toLocaleString("es-EC")}</div>
+            <div class="bold">Hotel La Farola - Parqueadero</div>
+            <div>Gracias por su visita</div>
+          </div>
+        </div>
+      </body>     
+    </html>
+  `)
+
+  printWindow.document.close()
+
+  // Imprimir automáticamente después de cargar
+  setTimeout(() => {
+    printWindow.print()
+    // Cerrar ventana después de imprimir
+    setTimeout(() => {
+      if (!printWindow.closed) {
+        printWindow.close()
+      }
+    }, 1000)
+  }, 500)
+}
   const formatEntrada = (entrada: string) => {
     const date = new Date(entrada)
     return date.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })
